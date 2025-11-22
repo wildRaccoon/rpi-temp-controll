@@ -55,12 +55,25 @@ class TapoController:
             Результат виконання coroutine
         """
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Якщо цикл вже запущений, створюємо новий
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            return loop.run_until_complete(coro)
+            # Спробувати отримати поточний event loop
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # Немає запущеного loop - створити новий
+                loop = None
+
+            if loop and loop.is_running():
+                # Loop вже запущений (наприклад, в async контексті)
+                # Не можна викликати run_until_complete
+                # Створюємо новий loop в окремому потоці
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, coro)
+                    return future.result()
+            else:
+                # Немає запущеного loop або він не запущений
+                # Використовуємо asyncio.run (рекомендований спосіб для Python 3.7+)
+                return asyncio.run(coro)
         except Exception as e:
             self.logger.error(f"Помилка виконання async операції: {e}")
             raise
