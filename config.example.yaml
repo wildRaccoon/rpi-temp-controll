@@ -29,9 +29,9 @@ sensors:
       # Підключення: VCC→Pin1(3.3V), GND→Pin6, DIN→Pin19(MOSI), DO→Pin21(MISO), CLK→Pin23(SCLK), CS→Pin24(GPIO8)
 
 tapo:
-  ip_address: "192.168.1.75"
-  email: "doe9518999@gmail.com"
-  password: "yr\$Y9L#XR2NC#L"
+  ip_address: "127.0.0.1"
+  email: "sample@gmail.com"
+  password: "sample"
   
 control:
   # Температури безпеки (критичні)

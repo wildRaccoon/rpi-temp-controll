@@ -42,6 +42,7 @@ data/
 
 # Конфігурація (може містити паролі)
 config.local.yaml
+config.rpi.yaml
 
 # Тестові файли
 test_*.py
