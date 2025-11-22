@@ -6,8 +6,18 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 from sensors.base import BaseSensor
-from sensors.ds18b20 import DS18B20Sensor
-from sensors.max31855 import MAX31855Sensor
+try:
+    from sensors.ds18b20 import DS18B20Sensor
+    DS18B20_AVAILABLE = True
+except Exception:
+    DS18B20_AVAILABLE = False
+
+try:
+    from sensors.max31855 import MAX31855Sensor
+    MAX31855_AVAILABLE = True
+except Exception:
+    MAX31855_AVAILABLE = False
+
 from tests.test_sensors import TestDS18B20Sensor, TestMAX31855Sensor
 from utils.config_manager import ConfigManager
 from utils.logger import get_logger
@@ -66,9 +76,14 @@ class SensorManager:
                     test_temps = self.config.get_test_temperatures()
                     base_temp = test_temps.get(sensor_key, 20.0)
                     sensor = TestDS18B20Sensor(sensor_id, name, sensor_config, base_temp)
-                else:
+                elif DS18B20_AVAILABLE:
                     # Production режим - всі датчики на одній 1-Wire шині
                     sensor = DS18B20Sensor(sensor_id, name, sensor_config)
+                else:
+                    self.logger.warning(f"DS18B20 недоступний (Windows або немає модулів ядра). Використовую тестовий датчик для {sensor_id}")
+                    test_temps = self.config.get_test_temperatures()
+                    base_temp = test_temps.get(sensor_key, 20.0)
+                    sensor = TestDS18B20Sensor(sensor_id, name, sensor_config, base_temp)
                 
                 if sensor.initialize():
                     self.sensors[sensor_id] = sensor
@@ -88,9 +103,14 @@ class SensorManager:
                     test_temps = self.config.get_test_temperatures()
                     base_temp = test_temps.get(sensor_key, 150.0)
                     sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
-                else:
+                elif MAX31855_AVAILABLE:
                     # Production режим
                     sensor = MAX31855Sensor(sensor_id, name, sensor_config)
+                else:
+                    self.logger.warning(f"MAX31855 недоступний (Windows або немає spidev). Використовую тестовий датчик для {sensor_id}")
+                    test_temps = self.config.get_test_temperatures()
+                    base_temp = test_temps.get(sensor_key, 150.0)
+                    sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
                 
                 if sensor.initialize():
                     self.sensors[sensor_id] = sensor
