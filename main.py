@@ -215,10 +215,16 @@ class TemperatureControlApp:
                 now = datetime.now()
                 if (now - last_log_time).total_seconds() >= log_interval:
                     system_state = self.temperature_controller.get_system_state()
+
+                    # Форматування температур з обробкою None
+                    boiler_str = f"{system_state['boiler_temp']:.1f}°C" if system_state['boiler_temp'] is not None else "N/A"
+                    accum_str = f"{system_state['accumulator_top_temp']:.1f}°C" if system_state['accumulator_top_temp'] is not None else "N/A"
+                    chimney_str = f"{system_state['chimney_temp']:.1f}°C" if system_state['chimney_temp'] is not None else "N/A"
+
                     self.logger.info(
-                        f"Статус: котел={system_state['boiler_temp']:.1f}°C, "
-                        f"термоак={system_state['accumulator_top_temp']:.1f}°C, "
-                        f"димар={system_state['chimney_temp']:.1f}°C, "
+                        f"Статус: котел={boiler_str}, "
+                        f"термоак={accum_str}, "
+                        f"димар={chimney_str}, "
                         f"розетка={system_state['outlet_status']}"
                     )
                     last_log_time = now

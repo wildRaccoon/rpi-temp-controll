@@ -122,17 +122,23 @@
                 {id: 'accumulator_top', name: 'Термоакумулятор (верх)', temp: data.accumulator_top_temp},
                 {id: 'chimney', name: 'Димар', temp: data.chimney_temp}
             ];
-            
+
             sensors.forEach(sensor => {
+                const card = document.createElement('div');
+                card.className = 'sensor-card';
+
+                let tempDisplay;
                 if (sensor.temp !== null && sensor.temp !== undefined) {
-                    const card = document.createElement('div');
-                    card.className = 'sensor-card';
-                    card.innerHTML = `
-                        <div class="sensor-name">${sensor.name}</div>
-                        <div class="temperature">${sensor.temp.toFixed(1)}°C</div>
-                    `;
-                    sensorsDiv.appendChild(card);
+                    tempDisplay = `${sensor.temp.toFixed(1)}°C`;
+                } else {
+                    tempDisplay = '<span style="color: #999;">N/A</span>';
                 }
+
+                card.innerHTML = `
+                    <div class="sensor-name">${sensor.name}</div>
+                    <div class="temperature">${tempDisplay}</div>
+                `;
+                sensorsDiv.appendChild(card);
             });
         }
         
