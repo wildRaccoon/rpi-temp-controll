@@ -136,29 +136,36 @@ class MAX31855Sensor(BaseSensor):
     def read_temperature(self) -> Optional[float]:
         """
         Зчитати температуру з датчика MAX31855.
-        
+
         Returns:
             Температура в градусах Цельсія або None при помилці
         """
         if not self.enabled or not self.sensor:
             return None
-        
+
         try:
             if self.use_spidev:
                 temperature = self._read_spidev()
             else:
                 # adafruit бібліотека
                 temperature = self.sensor.temperature
-            
+
             if temperature is None:
                 self.record_error()
                 return None
-            
+
+            # Валідація: температура димоходу не повинна перевищувати 300°C
+            # Якщо більше - це помилка зчитування
+            if temperature > 300.0:
+                self.logger.warning(f"MAX31855 {self.name}: температура {temperature:.1f}°C перевищує 300°C - помилка зчитування")
+                self.record_error()
+                return None
+
             self.last_reading = temperature
             self.last_update = datetime.now()
             self.reset_errors()
             return temperature
-            
+
         except Exception as e:
             self.logger.error(f"MAX31855 {self.name}: помилка зчитування - {e}")
             self.record_error()

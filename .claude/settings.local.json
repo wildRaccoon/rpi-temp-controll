@@ -3,7 +3,11 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(python -m pip install:*)",
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(timeout 5 python:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 8 python:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

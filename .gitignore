@@ -47,4 +47,5 @@ config.yaml
 # Системні файли
 .DS_Store
 Thumbs.db
+nul
 

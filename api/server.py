@@ -125,16 +125,22 @@ class APIServer:
         def api_history_temperatures():
             """Історичні дані температур."""
             from flask import request
-            
+
             sensor_id = request.args.get('sensor_id', None)
             hours = int(request.args.get('hours', 3))
-            
+
             data = self.database.get_temperature_history(sensor_id=sensor_id, hours=hours)
-            
+
+            # Додати назви датчиків для зручного відображення
+            sensor_names = {}
+            for sid, sensor in self.sensor_manager.sensors.items():
+                sensor_names[sid] = sensor.name
+
             return jsonify({
                 'sensor_id': sensor_id,
                 'period_hours': hours,
-                'data': data
+                'data': data,
+                'sensor_names': sensor_names
             })
         
         @self.app.route('/api/history/events')

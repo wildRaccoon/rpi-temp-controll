@@ -154,7 +154,7 @@
             // Групувати дані по датчиках
             const sensors = {};
             const timestamps = new Set();
-            
+
             data.data.forEach(item => {
                 if (!sensors[item.sensor_id]) {
                     sensors[item.sensor_id] = [];
@@ -165,21 +165,24 @@
                 });
                 timestamps.add(item.timestamp);
             });
-            
+
             const sortedTimes = Array.from(timestamps).sort();
-            
+
+            // Використовувати назви датчиків замість sensor_id
+            const sensorNames = data.sensor_names || {};
+
             const datasets = Object.keys(sensors).map(sensorId => {
                 const sensorData = sensors[sensorId];
                 const dataMap = new Map(sensorData.map(d => [d.time, d.temp]));
-                
+
                 return {
-                    label: sensorId,
+                    label: sensorNames[sensorId] || sensorId,
                     data: sortedTimes.map(time => dataMap.get(time) || null),
                     borderWidth: 2,
                     tension: 0.1
                 };
             });
-            
+
             tempChart.data.labels = sortedTimes.map(t => new Date(t).toLocaleTimeString('uk-UA'));
             tempChart.data.datasets = datasets;
             tempChart.update();
