@@ -1,0 +1,130 @@
+"""
+Менеджер для управління всіма датчиками.
+"""
+
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+
+from sensors.base import BaseSensor
+from sensors.ds18b20 import DS18B20Sensor
+from sensors.max31855 import MAX31855Sensor
+from tests.test_sensors import TestDS18B20Sensor, TestMAX31855Sensor
+from utils.config_manager import ConfigManager
+from utils.logger import get_logger
+
+
+class SensorManager:
+    """Клас для управління всіма датчиками температури."""
+    
+    def __init__(self, config: ConfigManager):
+        """
+        Ініціалізація менеджера датчиків.
+        
+        Args:
+            config: Об'єкт ConfigManager
+        """
+        self.config = config
+        self.logger = get_logger()
+        self.sensors: Dict[str, BaseSensor] = {}
+        self.is_test_mode = config.is_test_mode()
+        self._initialize_sensors()
+    
+    def _initialize_sensors(self) -> None:
+        """Ініціалізувати всі датчики з конфігурації."""
+        sensors_config = self.config.get_section('sensors')
+        
+        # Ініціалізувати DS18B20 датчики
+        ds18b20_config = sensors_config.get('ds18b20', {})
+        for sensor_key, sensor_config in ds18b20_config.items():
+            if sensor_config.get('enabled', False):
+                sensor_id = f"ds18b20_{sensor_key}"
+                name = sensor_config.get('name', sensor_key)
+                
+                if self.is_test_mode:
+                    # Тестовий режим
+                    test_temps = self.config.get_test_temperatures()
+                    base_temp = test_temps.get(sensor_key, 20.0)
+                    sensor = TestDS18B20Sensor(sensor_id, name, sensor_config, base_temp)
+                else:
+                    # Production режим
+                    sensor = DS18B20Sensor(sensor_id, name, sensor_config)
+                
+                if sensor.initialize():
+                    self.sensors[sensor_id] = sensor
+                    self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано")
+                else:
+                    self.logger.error(f"Не вдалося ініціалізувати датчик {sensor_id}")
+        
+        # Ініціалізувати MAX31855 датчики
+        max31855_config = sensors_config.get('max31855', {})
+        for sensor_key, sensor_config in max31855_config.items():
+            if sensor_config.get('enabled', False):
+                sensor_id = f"max31855_{sensor_key}"
+                name = sensor_config.get('name', sensor_key)
+                
+                if self.is_test_mode:
+                    # Тестовий режим
+                    test_temps = self.config.get_test_temperatures()
+                    base_temp = test_temps.get(sensor_key, 150.0)
+                    sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
+                else:
+                    # Production режим
+                    sensor = MAX31855Sensor(sensor_id, name, sensor_config)
+                
+                if sensor.initialize():
+                    self.sensors[sensor_id] = sensor
+                    self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано")
+                else:
+                    self.logger.error(f"Не вдалося ініціалізувати датчик {sensor_id}")
+    
+    def read_all(self) -> Dict[str, Optional[float]]:
+        """
+        Зчитати температури з усіх датчиків.
+        
+        Returns:
+            Словник {sensor_id: temperature}
+        """
+        readings = {}
+        for sensor_id, sensor in self.sensors.items():
+            if sensor.is_available():
+                readings[sensor_id] = sensor.read_temperature()
+            else:
+                readings[sensor_id] = None
+        return readings
+    
+    def get_sensor(self, sensor_id: str) -> Optional[BaseSensor]:
+        """
+        Отримати датчик за ID.
+        
+        Args:
+            sensor_id: ID датчика
+        
+        Returns:
+            Об'єкт датчика або None
+        """
+        return self.sensors.get(sensor_id)
+    
+    def get_all_status(self) -> List[Dict[str, Any]]:
+        """
+        Отримати статуси всіх датчиків.
+        
+        Returns:
+            Список словників зі статусами датчиків
+        """
+        return [sensor.get_status() for sensor in self.sensors.values()]
+    
+    def get_temperature(self, sensor_id: str) -> Optional[float]:
+        """
+        Отримати температуру конкретного датчика.
+        
+        Args:
+            sensor_id: ID датчика
+        
+        Returns:
+            Температура або None
+        """
+        sensor = self.get_sensor(sensor_id)
+        if sensor:
+            return sensor.read_temperature()
+        return None
+

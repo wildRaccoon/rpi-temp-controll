@@ -5,15 +5,15 @@ sensors:
   ds18b20:
     boiler:
       enabled: true
-      device_id: "28-xxxxx"  # ID датчика котла (автоматично визначається або вказується вручну)
+      device_id: "28-011913a8f76d"  # ID датчика котла (автоматично визначається або вказується вручну)
       name: "Котел"
     accumulator_bottom:
       enabled: true
-      device_id: "28-yyyyy"  # ID датчика термоакумулятора знизу
+      device_id: "28-011913a78132"  # ID датчика термоакумулятора знизу
       name: "Термоакумулятор (низ)"
     accumulator_top:
       enabled: true
-      device_id: "28-zzzzz"  # ID датчика термоакумулятора зверху
+      device_id: "28-011913c47b0c"  # ID датчика термоакумулятора зверху
       name: "Термоакумулятор (верх)"
   max31855:
     chimney:
@@ -24,21 +24,21 @@ sensors:
       name: "Димар"
 
 tapo:
-  ip_address: "192.168.1.100"
-  email: "your_email@example.com"
-  password: "your_password"
+  ip_address: "192.168.1.75"
+  email: "doe9518999@gmail.com"
+  password: "yr\$Y9L#XR2NC#L"
   
 control:
   # Температури безпеки (критичні)
-  boiler_critical_temp: 85.0      # Критична температура котла (°C)
+  boiler_critical_temp: 80.0      # Критична температура котла (°C)
   accumulator_critical_temp: 80.0  # Критична температура термоакумулятора (°C)
   
   # Безпечні температури (нормальна робота)
-  boiler_safe_temp: 70.0          # Безпечна температура котла (°C)
-  accumulator_safe_temp: 65.0      # Безпечна температура термоакумулятора (°C)
+  boiler_safe_temp: 75.0          # Безпечна температура котла (°C)
+  accumulator_safe_temp: 75.0      # Безпечна температура термоакумулятора (°C)
   
   # Температура димаря (визначення затухання)
-  chimney_low_temp: 100.0         # Низька температура димаря - дрова перегоріли (°C)
+  chimney_low_temp: 45.0         # Низька температура димаря - дрова перегоріли (°C)
   
   # Гістерезис
   hysteresis: 3.0                  # Гістерезис для уникнення частого перемикання (°C)
