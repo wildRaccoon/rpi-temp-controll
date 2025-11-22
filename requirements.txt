@@ -1,12 +1,12 @@
 # Основні залежності для програми контролю температури
 
 # Керування розеткою Tapo
-PyP100==0.1.0
+tapo>=0.7.4
 
 # Датчики температури
 w1thermsensor==2.0.0  # Для DS18B20 (1-Wire)
-adafruit-circuitpython-max31855==1.4.0  # Для MAX31855 (SPI термопара)
-spidev==3.6  # Альтернатива для SPI (якщо adafruit не працює)
+adafruit-circuitpython-max31855>=3.2.26  # Для MAX31855 (SPI термопара)
+spidev==3.6; platform_system == "Linux"  # Тільки для Linux/Raspberry Pi
 
 # Веб-сервер та API
 flask==3.0.0
