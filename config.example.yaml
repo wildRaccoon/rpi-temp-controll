@@ -1,0 +1,79 @@
+# Приклад конфігурації для системи контролю температури
+# Скопіюйте цей файл як config.yaml та налаштуйте під своє обладнання
+
+sensors:
+  ds18b20:
+    boiler:
+      enabled: true
+      device_id: "28-xxxxx"  # ID датчика котла (автоматично визначається або вказується вручну)
+      name: "Котел"
+    accumulator_bottom:
+      enabled: true
+      device_id: "28-yyyyy"  # ID датчика термоакумулятора знизу
+      name: "Термоакумулятор (низ)"
+    accumulator_top:
+      enabled: true
+      device_id: "28-zzzzz"  # ID датчика термоакумулятора зверху
+      name: "Термоакумулятор (верх)"
+  max31855:
+    chimney:
+      enabled: true
+      cs_pin: 8              # Chip Select пін для SPI (GPIO)
+      spi_port: 0             # SPI порт (0 або 1)
+      spi_device: 0           # SPI пристрій (зазвичай 0)
+      name: "Димар"
+
+tapo:
+  ip_address: "192.168.1.100"
+  email: "your_email@example.com"
+  password: "your_password"
+  
+control:
+  # Температури безпеки (критичні)
+  boiler_critical_temp: 85.0      # Критична температура котла (°C)
+  accumulator_critical_temp: 80.0  # Критична температура термоакумулятора (°C)
+  
+  # Безпечні температури (нормальна робота)
+  boiler_safe_temp: 70.0          # Безпечна температура котла (°C)
+  accumulator_safe_temp: 65.0      # Безпечна температура термоакумулятора (°C)
+  
+  # Температура димаря (визначення затухання)
+  chimney_low_temp: 100.0         # Низька температура димаря - дрова перегоріли (°C)
+  
+  # Гістерезис
+  hysteresis: 3.0                  # Гістерезис для уникнення частого перемикання (°C)
+  
+  # Інтервали
+  check_interval: 30               # Інтервал перевірки (секунди)
+  startup_duration: 300            # Тривалість початкового стану "затопили" (секунди)
+  
+logging:
+  enabled: true
+  log_file: "logs/temperature.log"
+  log_interval: 300        # Інтервал логування (секунди)
+
+database:
+  enabled: true
+  db_file: "data/temperature.db"  # Шлях до бази даних
+  retention_days: 7        # Зберігати дані за останні 7 днів
+  cleanup_interval: 3600   # Інтервал очищення старих даних (секунди)
+
+api:
+  enabled: true
+  host: "0.0.0.0"          # Адреса для прослуховування
+  port: 8080                # Порт для API та веб-інтерфейсу
+  debug: false              # Режим налагодження
+
+test_mode:
+  enabled: false            # Увімкнути тестовий режим
+  scenario: "normal"        # Тестовий сценарій: "normal", "critical", "cooling", "startup"
+  # Тестові температури (якщо scenario не вказано, використовуються ці значення)
+  test_temperatures:
+    boiler: 75.0
+    accumulator_bottom: 68.0
+    accumulator_top: 72.0
+    chimney: 180.0
+  # Або можна вказати діапазони для симуляції змін
+  temperature_variation: true  # Дозволити варіації температур
+  variation_range: 2.0         # Діапазон варіації (°C)
+
