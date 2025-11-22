@@ -97,26 +97,38 @@ class SensorManager:
             if sensor_config.get('enabled', False):
                 sensor_id = f"max31855_{sensor_key}"
                 name = sensor_config.get('name', sensor_key)
-                
+
                 if self.is_test_mode:
                     # Тестовий режим
                     test_temps = self.config.get_test_temperatures()
                     base_temp = test_temps.get(sensor_key, 150.0)
                     sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
                 elif MAX31855_AVAILABLE:
-                    # Production режим
+                    # Production режим - спробувати реальний датчик
                     sensor = MAX31855Sensor(sensor_id, name, sensor_config)
                 else:
                     self.logger.warning(f"MAX31855 недоступний (Windows або немає spidev). Використовую тестовий датчик для {sensor_id}")
                     test_temps = self.config.get_test_temperatures()
                     base_temp = test_temps.get(sensor_key, 150.0)
                     sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
-                
+
                 if sensor.initialize():
                     self.sensors[sensor_id] = sensor
                     self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано")
                 else:
-                    self.logger.error(f"Не вдалося ініціалізувати датчик {sensor_id}")
+                    # Якщо не вдалося ініціалізувати реальний датчик - fallback на тестовий
+                    if not self.is_test_mode and isinstance(sensor, MAX31855Sensor):
+                        self.logger.warning(f"MAX31855 датчик не ініціалізувався (немає обладнання). Використовую тестовий датчик для {sensor_id}")
+                        test_temps = self.config.get_test_temperatures()
+                        base_temp = test_temps.get(sensor_key, 150.0)
+                        sensor = TestMAX31855Sensor(sensor_id, name, sensor_config, base_temp)
+                        if sensor.initialize():
+                            self.sensors[sensor_id] = sensor
+                            self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано (тестовий)")
+                        else:
+                            self.logger.error(f"Не вдалося ініціалізувати навіть тестовий датчик {sensor_id}")
+                    else:
+                        self.logger.error(f"Не вдалося ініціалізувати датчик {sensor_id}")
     
     def read_all(self) -> Dict[str, Optional[float]]:
         """
