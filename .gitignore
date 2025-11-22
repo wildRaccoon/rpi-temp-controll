@@ -1,4 +1,4 @@
-# Python
+cla# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -42,7 +42,7 @@ data/
 
 # Конфігурація (може містити паролі)
 config.local.yaml
-config.rpi.yaml
+config.yaml
 
 # Системні файли
 .DS_Store
