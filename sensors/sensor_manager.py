@@ -30,11 +30,32 @@ class SensorManager:
         self._initialize_sensors()
     
     def _initialize_sensors(self) -> None:
-        """Ініціалізувати всі датчики з конфігурації."""
+        """
+        Ініціалізувати всі датчики з конфігурації.
+        
+        Примітка: Всі DS18B20 датчики підключені до однієї 1-Wire шини (GPIO 4).
+        Кожен датчик ідентифікується за унікальним device_id.
+        """
         sensors_config = self.config.get_section('sensors')
         
         # Ініціалізувати DS18B20 датчики
+        # Всі датчики на одній 1-Wire шині, але мають різні device_id
         ds18b20_config = sensors_config.get('ds18b20', {})
+        
+        if not self.is_test_mode and ds18b20_config:
+            # У production режимі можна показати всі доступні датчики на шині
+            try:
+                from w1thermsensor import W1ThermSensor, Sensor
+                available_sensors = W1ThermSensor.get_available_sensors([Sensor.DS18B20])
+                if available_sensors:
+                    self.logger.info(
+                        f"Знайдено {len(available_sensors)} DS18B20 датчик(ів) на 1-Wire шині (GPIO 4):"
+                    )
+                    for s in available_sensors:
+                        self.logger.info(f"  - ID: {s.id}")
+            except:
+                pass
+        
         for sensor_key, sensor_config in ds18b20_config.items():
             if sensor_config.get('enabled', False):
                 sensor_id = f"ds18b20_{sensor_key}"
@@ -46,12 +67,12 @@ class SensorManager:
                     base_temp = test_temps.get(sensor_key, 20.0)
                     sensor = TestDS18B20Sensor(sensor_id, name, sensor_config, base_temp)
                 else:
-                    # Production режим
+                    # Production режим - всі датчики на одній 1-Wire шині
                     sensor = DS18B20Sensor(sensor_id, name, sensor_config)
                 
                 if sensor.initialize():
                     self.sensors[sensor_id] = sensor
-                    self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано")
+                    self.logger.info(f"Датчик {sensor_id} ({name}) ініціалізовано на 1-Wire шині")
                 else:
                     self.logger.error(f"Не вдалося ініціалізувати датчик {sensor_id}")
         

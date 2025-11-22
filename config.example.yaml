@@ -3,25 +3,30 @@
 
 sensors:
   ds18b20:
+    # Всі DS18B20 датчики підключені до однієї 1-Wire шини (GPIO 4, Pin 7)
+    # Кожен датчик має унікальний device_id для розрізнення
+    # ID можна знайти командою: ls /sys/bus/w1/devices/
+    # Підключення: VCC→Pin1(3.3V), DATA→Pin7(GPIO4), GND→Pin6, резистор 4.7кОм між DATA та VCC
     boiler:
       enabled: true
-      device_id: "28-011913a8f76d"  # ID датчика котла (автоматично визначається або вказується вручну)
+      device_id: "28-xxxxx"  # ID датчика котла (знайти після підключення)
       name: "Котел"
     accumulator_bottom:
       enabled: true
-      device_id: "28-011913a78132"  # ID датчика термоакумулятора знизу
+      device_id: "28-yyyyy"  # ID датчика термоакумулятора знизу
       name: "Термоакумулятор (низ)"
     accumulator_top:
       enabled: true
-      device_id: "28-011913c47b0c"  # ID датчика термоакумулятора зверху
+      device_id: "28-zzzzz"  # ID датчика термоакумулятора зверху
       name: "Термоакумулятор (верх)"
   max31855:
     chimney:
       enabled: true
-      cs_pin: 8              # Chip Select пін для SPI (GPIO)
+      cs_pin: 8              # Chip Select пін для SPI (GPIO 8 = Pin 24)
       spi_port: 0             # SPI порт (0 або 1)
       spi_device: 0           # SPI пристрій (зазвичай 0)
       name: "Димар"
+      # Підключення: VCC→Pin1(3.3V), GND→Pin6, DIN→Pin19(MOSI), DO→Pin21(MISO), CLK→Pin23(SCLK), CS→Pin24(GPIO8)
 
 tapo:
   ip_address: "192.168.1.75"

@@ -37,6 +37,9 @@ class DS18B20Sensor(BaseSensor):
         """
         Ініціалізувати датчик DS18B20.
         
+        Примітка: Всі DS18B20 датчики підключені до однієї 1-Wire шини (GPIO 4).
+        Кожен датчик ідентифікується за унікальним device_id.
+        
         Returns:
             True якщо ініціалізація успішна
         """
@@ -54,24 +57,50 @@ class DS18B20Sensor(BaseSensor):
         try:
             if self.device_id:
                 # Використати конкретний device_id
+                # Всі датчики на одній 1-Wire шині, але мають різні ID
                 self.sensor = W1ThermSensor(sensor_type=Sensor.DS18B20, sensor_id=self.device_id)
+                self.logger.info(
+                    f"DS18B20 {self.name}: використовується датчик з ID {self.device_id} "
+                    f"(1-Wire шина GPIO 4)"
+                )
             else:
-                # Автоматичне визначення першого доступного датчика
+                # Автоматичне визначення - знайти всі доступні датчики на 1-Wire шині
                 sensors = W1ThermSensor.get_available_sensors([Sensor.DS18B20])
                 if not sensors:
-                    self.logger.error(f"DS18B20 {self.name}: датчик не знайдено")
+                    self.logger.error(
+                        f"DS18B20 {self.name}: датчики не знайдено на 1-Wire шині (GPIO 4). "
+                        f"Перевірте підключення та увімкнення 1-Wire інтерфейсу."
+                    )
                     return False
+                
+                # Якщо знайдено кілька датчиків, використати перший
+                # Але краще вказати device_id в конфігурації
+                if len(sensors) > 1:
+                    self.logger.warning(
+                        f"DS18B20 {self.name}: знайдено {len(sensors)} датчиків на 1-Wire шині. "
+                        f"Рекомендується вказати device_id в конфігурації для коректної роботи."
+                    )
+                
                 self.sensor = sensors[0]
                 self.device_id = self.sensor.id
-                self.logger.info(f"DS18B20 {self.name}: знайдено датчик з ID {self.device_id}")
+                self.logger.info(
+                    f"DS18B20 {self.name}: автоматично знайдено датчик з ID {self.device_id} "
+                    f"на 1-Wire шині (GPIO 4)"
+                )
             
             # Тестове зчитування
             temp = self.sensor.get_temperature()
-            self.logger.info(f"DS18B20 {self.name}: ініціалізовано (ID: {self.device_id}, тест: {temp:.2f}°C)")
+            self.logger.info(
+                f"DS18B20 {self.name}: ініціалізовано успішно "
+                f"(ID: {self.device_id}, тест: {temp:.2f}°C, 1-Wire шина GPIO 4)"
+            )
             return True
             
         except Exception as e:
-            self.logger.error(f"DS18B20 {self.name}: помилка ініціалізації - {e}")
+            self.logger.error(
+                f"DS18B20 {self.name}: помилка ініціалізації - {e}. "
+                f"Перевірте підключення до 1-Wire шини (GPIO 4) та наявність device_id."
+            )
             return False
     
     def read_temperature(self) -> Optional[float]:
