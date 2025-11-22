@@ -5,8 +5,9 @@ tapo>=0.7.4
 
 # Датчики температури
 w1thermsensor==2.0.0  # Для DS18B20 (1-Wire)
-adafruit-circuitpython-max31855>=3.2.26  # Для MAX31855 (SPI термопара)
-spidev==3.6; platform_system == "Linux"  # Тільки для Linux/Raspberry Pi
+# MAX31855 (SPI термопара) - основний метод через spidev
+spidev==3.6; platform_system == "Linux"  # Для MAX31855 на Raspberry Pi
+RPi.GPIO; platform_system == "Linux"  # GPIO для Raspberry Pi
 
 # Веб-сервер та API
 flask==3.0.0

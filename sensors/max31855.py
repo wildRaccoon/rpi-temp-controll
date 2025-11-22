@@ -5,20 +5,23 @@
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+# Спочатку намагаємось використати spidev (простіше і надійніше на Raspberry Pi)
+try:
+    import spidev
+    import RPi.GPIO as GPIO
+    SPIDEV_AVAILABLE = True
+except ImportError:
+    SPIDEV_AVAILABLE = False
+
+# Adafruit як запасний варіант
 try:
     import adafruit_max31855 as max31855
     import board
     import busio
     import digitalio
     ADAFRUIT_AVAILABLE = True
-except ImportError:
+except (ImportError, NameError):
     ADAFRUIT_AVAILABLE = False
-    try:
-        import spidev
-        import RPi.GPIO as GPIO
-        SPIDEV_AVAILABLE = True
-    except ImportError:
-        SPIDEV_AVAILABLE = False
 
 from sensors.base import BaseSensor
 from utils.logger import get_logger
@@ -47,40 +50,29 @@ class MAX31855Sensor(BaseSensor):
     def initialize(self) -> bool:
         """
         Ініціалізувати датчик MAX31855.
-        
+
         Returns:
             True якщо ініціалізація успішна
         """
         if not self.enabled:
             self.logger.info(f"MAX31855 {self.name}: вимкнено в конфігурації")
             return False
-        
-        # Спробувати використати adafruit бібліотеку
-        if ADAFRUIT_AVAILABLE:
-            try:
-                spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-                cs = digitalio.DigitalInOut(getattr(board, f"D{self.cs_pin}"))
-                self.sensor = max31855.MAX31855(spi, cs)
-                self.logger.info(f"MAX31855 {self.name}: ініціалізовано (adafruit, CS: {self.cs_pin})")
-                return True
-            except Exception as e:
-                self.logger.warning(f"MAX31855 {self.name}: помилка adafruit - {e}, спроба spidev")
-        
-        # Якщо adafruit не працює, спробувати spidev
+
+        # Спочатку спробувати spidev (простіше і надійніше)
         if SPIDEV_AVAILABLE:
             try:
                 import spidev
                 import RPi.GPIO as GPIO
-                
+
                 GPIO.setmode(GPIO.BCM)
                 GPIO.setup(self.cs_pin, GPIO.OUT)
                 GPIO.output(self.cs_pin, GPIO.HIGH)
-                
+
                 spi = spidev.SpiDev()
                 spi.open(self.spi_port, self.spi_device)
                 spi.max_speed_hz = 5000000
                 spi.mode = 0b11
-                
+
                 self.sensor = {
                     'spi': spi,
                     'cs_pin': self.cs_pin
@@ -89,11 +81,22 @@ class MAX31855Sensor(BaseSensor):
                 self.logger.info(f"MAX31855 {self.name}: ініціалізовано (spidev, CS: {self.cs_pin})")
                 return True
             except Exception as e:
-                self.logger.error(f"MAX31855 {self.name}: помилка spidev - {e}")
-        
+                self.logger.warning(f"MAX31855 {self.name}: помилка spidev - {e}, спроба adafruit")
+
+        # Якщо spidev не працює, спробувати adafruit бібліотеку
+        if ADAFRUIT_AVAILABLE:
+            try:
+                spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
+                cs = digitalio.DigitalInOut(getattr(board, f"D{self.cs_pin}"))
+                self.sensor = max31855.MAX31855(spi, cs)
+                self.logger.info(f"MAX31855 {self.name}: ініціалізовано (adafruit, CS: {self.cs_pin})")
+                return True
+            except Exception as e:
+                self.logger.error(f"MAX31855 {self.name}: помилка adafruit - {e}")
+
         self.logger.error(
             f"MAX31855 {self.name}: не вдалося ініціалізувати. "
-            f"Встановіть: pip install adafruit-circuitpython-max31855 або pip install spidev RPi.GPIO"
+            f"Встановіть: pip install spidev RPi.GPIO (рекомендовано) або pip install adafruit-circuitpython-max31855"
         )
         return False
     
