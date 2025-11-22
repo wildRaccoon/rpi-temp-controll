@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Графіки температури</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .controls select, .controls button {
+            padding: 8px 15px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .chart-container {
+            margin: 20px 0;
+            position: relative;
+            height: 400px;
+        }
+        .test-mode {
+            background: #ffeb3b;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Графіки температури та активності</h1>
+        
+        {% if test_mode %}
+        <div class="test-mode">⚠️ ТЕСТОВИЙ РЕЖИМ</div>
+        {% endif %}
+        
+        <div class="controls">
+            <label>Період:</label>
+            <select id="period-select">
+                <option value="3">3 години</option>
+                <option value="6">6 годин</option>
+                <option value="12">12 годин</option>
+                <option value="24">24 години</option>
+            </select>
+            <button onclick="updateCharts()">Оновити</button>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="temperature-chart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="outlet-chart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        let tempChart, outletChart;
+        
+        function initCharts() {
+            const tempCtx = document.getElementById('temperature-chart').getContext('2d');
+            const outletCtx = document.getElementById('outlet-chart').getContext('2d');
+            
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Температура (°C)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            outletChart = new Chart(outletCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Розетка',
+                        data: [],
+                        backgroundColor: []
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return value === 1 ? 'УВІМКНЕНО' : 'ВИМКНЕНО';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateCharts() {
+            const hours = parseInt(document.getElementById('period-select').value);
+            
+            // Отримати дані температур
+            fetch(`/api/history/temperatures?hours=${hours}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateTemperatureChart(data);
+                });
+            
+            // Отримати події розетки
+            fetch(`/api/history/events?hours=${hours}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateOutletChart(data);
+                });
+        }
+        
+        function updateTemperatureChart(data) {
+            // Групувати дані по датчиках
+            const sensors = {};
+            const timestamps = new Set();
+            
+            data.data.forEach(item => {
+                if (!sensors[item.sensor_id]) {
+                    sensors[item.sensor_id] = [];
+                }
+                sensors[item.sensor_id].push({
+                    time: item.timestamp,
+                    temp: item.temperature
+                });
+                timestamps.add(item.timestamp);
+            });
+            
+            const sortedTimes = Array.from(timestamps).sort();
+            
+            const datasets = Object.keys(sensors).map(sensorId => {
+                const sensorData = sensors[sensorId];
+                const dataMap = new Map(sensorData.map(d => [d.time, d.temp]));
+                
+                return {
+                    label: sensorId,
+                    data: sortedTimes.map(time => dataMap.get(time) || null),
+                    borderWidth: 2,
+                    tension: 0.1
+                };
+            });
+            
+            tempChart.data.labels = sortedTimes.map(t => new Date(t).toLocaleTimeString('uk-UA'));
+            tempChart.data.datasets = datasets;
+            tempChart.update();
+        }
+        
+        function updateOutletChart(data) {
+            const labels = [];
+            const values = [];
+            const colors = [];
+            
+            data.events.forEach(event => {
+                labels.push(new Date(event.timestamp).toLocaleString('uk-UA'));
+                values.push(event.action === 'on' ? 1 : 0);
+                colors.push(event.action === 'on' ? '#4caf50' : '#f44336');
+            });
+            
+            outletChart.data.labels = labels;
+            outletChart.data.datasets[0].data = values;
+            outletChart.data.datasets[0].backgroundColor = colors;
+            outletChart.update();
+        }
+        
+        // Ініціалізація та перше оновлення
+        initCharts();
+        updateCharts();
+        
+        // Автоматичне оновлення кожні 30 секунд
+        setInterval(updateCharts, 30000);
+    </script>
+</body>
+</html>
+
