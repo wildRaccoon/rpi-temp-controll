@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
+User=raccoon
 WorkingDirectory=/home/raccoon/rpi-temp-controll
 Environment="PATH=/home/raccoon/rpi-temp-controll/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/home/raccoon/rpi-temp-controll/venv/bin/python /home/raccoon/rpi-temp-controll/main.py
