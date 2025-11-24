@@ -76,31 +76,45 @@ pip install -r requirements.txt
    # Ви побачите щось на кшталт: 28-00000abc1234
    ```
 
-### Підключення MAX31855 (SPI)
+### Підключення MAX31855 (SPI термопара для димаря)
 
-1. Підключіть MAX31855 до SPI:
-   - VCC → Pin 1 (3.3V)
-   - GND → Pin 6 (GND)
-   - DIN → Pin 19 (MOSI)
-   - DO → Pin 21 (MISO)
-   - CLK → Pin 23 (SCLK)
-   - CS → Pin 24 (GPIO 8) або інший GPIO
+1. Підключіть MAX31855 до Raspberry Pi через SPI:
 
-2. Увімкніть SPI:
+   | MAX31855 | Raspberry Pi | GPIO | Пін |
+   |----------|--------------|------|-----|
+   | **VIN** | 3.3V | - | Pin 1 або 17 |
+   | **GND** | Ground | - | Pin 6, 9, 14, 20 (будь-який) |
+   | **CLK** | SPI Clock | GPIO 11 | Pin 23 (SCLK) |
+   | **CS** | Chip Select | GPIO 8 | Pin 24 (CE0) |
+   | **DO** | SPI Data Out | GPIO 9 | Pin 21 (MISO) |
+
+   **Важливо:**
+   - MAX31855 працює тільки з **3.3V** (НЕ 5V!)
+   - DO (Data Out) на платі = MISO (Master In Slave Out) на Raspberry Pi
+   - MAX31855 НЕ використовує MOSI - це read-only пристрій
+   - Підключіть термопару типу K до клем + та - на MAX31855
+
+2. Увімкніть SPI інтерфейс:
    ```bash
    sudo raspi-config
-   # Interface Options → SPI → Enable
+   # Interface Options → SPI → Enable → Yes
    ```
 
-3. Перезавантажте:
+3. Перезавантажте Raspberry Pi:
    ```bash
    sudo reboot
    ```
 
-4. Перевірте SPI:
+4. Після перезавантаження перевірте, що SPI активовано:
    ```bash
    ls /dev/spi*
-   # Має бути /dev/spidev0.0 або /dev/spidev0.1
+   # Має показати: /dev/spidev0.0 та /dev/spidev0.1
+   ```
+
+5. Встановіть необхідні бібліотеки для роботи з SPI:
+   ```bash
+   source venv/bin/activate
+   pip install spidev RPi.GPIO
    ```
 
 ### Налаштування прав доступу
@@ -142,14 +156,35 @@ ls /sys/bus/w1/devices/
    sensors:
      ds18b20:
        boiler:
+         enabled: true
          device_id: "28-xxxxx"  # Замініть на реальний ID
+         name: "Котел"
        accumulator_bottom:
+         enabled: true
          device_id: "28-yyyyy"  # Замініть на реальний ID
+         name: "Термоакумулятор (низ)"
        accumulator_top:
+         enabled: true
          device_id: "28-zzzzz"  # Замініть на реальний ID
+         name: "Термоакумулятор (верх)"
    ```
 
-2. **Розетка Tapo:**
+2. **Датчик MAX31855 (термопара димаря):**
+   ```yaml
+   sensors:
+     max31855:
+       chimney:
+         enabled: true
+         cs_pin: 8              # GPIO 8 (Pin 24, CE0)
+         spi_port: 0            # SPI0
+         spi_device: 0          # SPI Device 0
+         name: "Димар"
+   ```
+
+   **Примітка:** Якщо потрібно використати інший CS пін (не GPIO 8),
+   змініть значення `cs_pin` та підключіть CS дріт до відповідного GPIO.
+
+3. **Розетка Tapo:**
    ```yaml
    tapo:
      ip_address: "192.168.1.100"  # IP адреса вашої розетки
@@ -157,7 +192,7 @@ ls /sys/bus/w1/devices/
      password: "your_password"
    ```
 
-3. **Порогові температури:**
+4. **Порогові температури:**
    ```yaml
    control:
      boiler_critical_temp: 85.0
