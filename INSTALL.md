@@ -345,7 +345,7 @@ tail -f logs/temperature.log
 
 ```bash
 cd ~/tapo
-sudo cp tapo-temperature.service /etc/systemd/system/
+sudo cp temperature.service /etc/systemd/system/
 ```
 
 ### Редагування шляхів (якщо потрібно)
@@ -353,7 +353,7 @@ sudo cp tapo-temperature.service /etc/systemd/system/
 Якщо проект знаходиться не в `/home/pi/tapo`, відредагуйте файл:
 
 ```bash
-sudo nano /etc/systemd/system/tapo-temperature.service
+sudo nano /etc/systemd/system/temperature.service
 ```
 
 Змініть шляхи:
@@ -368,32 +368,32 @@ sudo nano /etc/systemd/system/tapo-temperature.service
 sudo systemctl daemon-reload
 
 # Увімкнути автозапуск
-sudo systemctl enable tapo-temperature.service
+sudo systemctl enable temperature.service
 
 # Запустити сервіс
-sudo systemctl start tapo-temperature.service
+sudo systemctl start temperature.service
 
 # Перевірити статус
-sudo systemctl status tapo-temperature.service
+sudo systemctl status temperature.service
 ```
 
 ### Управління сервісом
 
 ```bash
 # Переглянути статус
-sudo systemctl status tapo-temperature.service
+sudo systemctl status temperature.service
 
 # Переглянути логи
-sudo journalctl -u tapo-temperature.service -f
+sudo journalctl -u temperature.service -f
 
 # Перезапустити
-sudo systemctl restart tapo-temperature.service
+sudo systemctl restart temperature.service
 
 # Зупинити
-sudo systemctl stop tapo-temperature.service
+sudo systemctl stop temperature.service
 
 # Вимкнути автозапуск
-sudo systemctl disable tapo-temperature.service
+sudo systemctl disable temperature.service
 ```
 
 ## 🔍 Крок 8: Перевірка роботи
@@ -424,7 +424,7 @@ curl http://localhost:8080/api/system
 tail -f logs/temperature.log
 
 # Логи systemd
-sudo journalctl -u tapo-temperature.service -f
+sudo journalctl -u temperature.service -f
 ```
 
 ## 🛠️ Крок 9: Налаштування firewall (опціонально)
@@ -459,7 +459,7 @@ cd ~/tapo
 source venv/bin/activate
 git pull  # Якщо використовується Git
 pip install -r requirements.txt --upgrade
-sudo systemctl restart tapo-temperature.service
+sudo systemctl restart temperature.service
 ```
 
 ## ❗ Вирішення проблем
@@ -501,7 +501,7 @@ sudo systemctl restart tapo-temperature.service
 
 1. Перевірте логи:
    ```bash
-   sudo journalctl -u tapo-temperature.service -n 50
+   sudo journalctl -u temperature.service -n 50
    ```
 
 2. Перевірте шляхи в сервіс файлі

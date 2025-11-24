@@ -12,8 +12,8 @@ from threading import Event
 from utils.config_manager import ConfigManager
 from utils.logger import Logger
 from sensors.sensor_manager import SensorManager
-from controllers.tapo_controller import TapoController
-from tests.test_tapo import TestTapoController
+from controllers.sonoff_controller import SonoffController
+from tests.test_sonoff import TestSonoffController
 from controllers.temperature_controller import TemperatureController
 from database.db import Database
 from api.server import APIServer
@@ -68,18 +68,18 @@ class TemperatureControlApp:
         # Менеджер датчиків
         self.sensor_manager = SensorManager(self.config)
         
-        # Контролер розетки
+        # Контролер розетки Sonoff S60 з Tasmota
         if self.config.is_test_mode():
-            self.tapo_controller = TestTapoController(self.config)
+            self.sonoff_controller = TestSonoffController(self.config)
         else:
-            self.tapo_controller = TapoController(self.config)
-            if not self.tapo_controller.connect():
-                self.logger.warning("Не вдалося підключитися до розетки Tapo, продовжуємо...")
-        
+            self.sonoff_controller = SonoffController(self.config)
+            if not self.sonoff_controller.connect():
+                self.logger.warning("Не вдалося підключитися до розетки Sonoff, продовжуємо...")
+
         # Контролер температури
         self.temperature_controller = TemperatureController(
             self.sensor_manager,
-            self.tapo_controller,
+            self.sonoff_controller,
             self.config
         )
         
@@ -205,7 +205,7 @@ class TemperatureControlApp:
                 outlet_reason = self.temperature_controller.update_control()
                 
                 # Збереження події розетки, якщо стан змінився
-                current_outlet_state = self.temperature_controller.tapo_controller.get_status()
+                current_outlet_state = self.temperature_controller.sonoff_controller.get_status()
                 if current_outlet_state != last_outlet_state and outlet_reason:
                     action = 'on' if current_outlet_state else 'off'
                     self.database.save_outlet_event(action, outlet_reason)
@@ -253,7 +253,7 @@ class TemperatureControlApp:
             self.api_server.stop()
         
         # Безпечно вимкнути розетку (опціонально)
-        # self.tapo_controller.turn_off()
+        # self.sonoff_controller.turn_off()
         
         self.logger.info("Програма завершена")
 

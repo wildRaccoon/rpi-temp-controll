@@ -93,21 +93,21 @@ class ConfigManager:
         Returns:
             True якщо конфігурація валідна
         """
-        required_sections = ['sensors', 'tapo', 'control', 'api']
-        
+        required_sections = ['sensors', 'sonoff', 'control', 'api']
+
         for section in required_sections:
             if section not in self.config:
                 raise ValueError(f"Відсутня обов'язкова секція: {section}")
-        
+
         # Перевірка налаштувань датчиків
         sensors = self.get_section('sensors')
         if not sensors.get('ds18b20') and not sensors.get('max31855'):
             raise ValueError("Повинен бути увімкнений хоча б один датчик")
-        
-        # Перевірка налаштувань Tapo
-        tapo = self.get_section('tapo')
-        if not tapo.get('ip_address'):
-            raise ValueError("Не вказано IP адресу розетки Tapo")
+
+        # Перевірка налаштувань Sonoff
+        sonoff = self.get_section('sonoff')
+        if not sonoff.get('ip_address'):
+            raise ValueError("Не вказано IP адресу розетки Sonoff")
         
         return True
     

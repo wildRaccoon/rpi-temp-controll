@@ -28,10 +28,18 @@ sensors:
       name: "Димар"
       # Підключення: VCC→Pin1(3.3V), GND→Pin6, DIN→Pin19(MOSI), DO→Pin21(MISO), CLK→Pin23(SCLK), CS→Pin24(GPIO8)
 
-tapo:
-  ip_address: "127.0.0.1"
-  email: "sample@gmail.com"
-  password: "sample"
+sonoff:
+  ip_address: "192.168.1.100"  # IP адреса Sonoff S60 з прошивкою Tasmota
+  # Tasmota використовує HTTP API (за замовчуванням) або MQTT (опціонально)
+  # Для HTTP API потрібна тільки IP адреса
+
+mqtt:  # Опціонально для MQTT підтримки
+  enabled: false               # Увімкнути MQTT (поки не реалізовано)
+  broker: "192.168.1.50"       # IP адреса MQTT брокера
+  port: 1883                    # Порт MQTT брокера
+  username: ""                  # Опціонально
+  password: ""                  # Опціонально
+  topic_prefix: "sonoff_s60"    # Префікс топіку для MQTT
   
 control:
   # Температури безпеки (критичні)

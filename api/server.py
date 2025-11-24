@@ -77,7 +77,7 @@ class APIServer:
         def api_status():
             """Загальний статус системи."""
             sensors = self.sensor_manager.get_all_status()
-            outlet_info = self.temperature_controller.tapo_controller.get_info()
+            outlet_info = self.temperature_controller.sonoff_controller.get_info()
             
             return jsonify({
                 'status': 'running',
@@ -103,8 +103,8 @@ class APIServer:
         
         @self.app.route('/api/outlet')
         def api_outlet():
-            """Статус розетки Tapo."""
-            outlet_info = self.temperature_controller.tapo_controller.get_info()
+            """Статус розетки Sonoff S60."""
+            outlet_info = self.temperature_controller.sonoff_controller.get_info()
             system_state = self.temperature_controller.get_system_state()
             
             return jsonify({

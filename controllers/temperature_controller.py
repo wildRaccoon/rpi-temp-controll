@@ -6,8 +6,8 @@ from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 
 from sensors.sensor_manager import SensorManager
-from controllers.tapo_controller import TapoController
-from tests.test_tapo import TestTapoController
+from controllers.sonoff_controller import SonoffController
+from tests.test_sonoff import TestSonoffController
 from utils.config_manager import ConfigManager
 from utils.logger import get_logger
 
@@ -18,19 +18,19 @@ class TemperatureController:
     def __init__(
         self,
         sensor_manager: SensorManager,
-        tapo_controller,
+        sonoff_controller,
         config: ConfigManager
     ):
         """
         Ініціалізація контролера температури.
-        
+
         Args:
             sensor_manager: Менеджер датчиків
-            tapo_controller: Контролер розетки Tapo (TapoController або TestTapoController)
+            sonoff_controller: Контролер розетки Sonoff (SonoffController або TestSonoffController)
             config: Об'єкт ConfigManager
         """
         self.sensor_manager = sensor_manager
-        self.tapo_controller = tapo_controller
+        self.sonoff_controller = sonoff_controller
         self.config = config
         self.logger = get_logger()
         
@@ -168,7 +168,7 @@ class TemperatureController:
         self.get_temperatures()
         
         # Отримати поточний стан розетки
-        current_state = self.tapo_controller.get_status()
+        current_state = self.sonoff_controller.get_status()
         
         # Визначити, чи потрібно змінити стан
         should_on, reason_on = self.should_turn_on()
@@ -177,7 +177,7 @@ class TemperatureController:
         # Логіка керування
         if should_on and (current_state is False or current_state is None):
             # Потрібно увімкнути
-            if self.tapo_controller.turn_on():
+            if self.sonoff_controller.turn_on():
                 self.current_outlet_state = True
                 self.last_outlet_reason = reason_on
                 self.logger.info(f"Розетка увімкнена. Причина: {reason_on}")
@@ -185,7 +185,7 @@ class TemperatureController:
         
         elif should_off and (current_state is True):
             # Потрібно вимкнути
-            if self.tapo_controller.turn_off():
+            if self.sonoff_controller.turn_off():
                 self.current_outlet_state = False
                 self.last_outlet_reason = reason_off
                 self.logger.info(f"Розетка вимкнена. Причина: {reason_off}")
@@ -204,7 +204,7 @@ class TemperatureController:
         boiler_temp = self.get_boiler_temp()
         bottom_temp, top_temp = self.get_accumulator_temps()
         chimney_temp = self.get_chimney_temp()
-        outlet_status = self.tapo_controller.get_status()
+        outlet_status = self.sonoff_controller.get_status()
         
         # Визначити загальний стан системи
         if self.is_startup_period():
