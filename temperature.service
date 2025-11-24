@@ -1,17 +1,23 @@
 [Unit]
-Description=Система контролю температури для твердопаливного котла
-After=network.target
+Description=Система контролю температури для твердопаливного котла (Sonoff S60)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
+# Замініть 'raccoon' на ваше ім'я користувача або 'pi' для Raspberry Pi OS
 User=raccoon
+Group=raccoon
 WorkingDirectory=/home/raccoon/rpi-temp-controll
-Environment="PATH=/home/raccoon/rpi-temp-controll/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/home/raccoon/rpi-temp-controll/venv/bin/python /home/raccoon/rpi-temp-controll/main.py
+Environment="PATH=/home/raccoon/rpi-temp-controll/venv/bin"
+ExecStart=/home/raccoon/rpi-temp-controll/venv/bin/python main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+
+# Дозволити доступ до GPIO та SPI
+SupplementaryGroups=gpio spi
 
 # Безпека
 NoNewPrivileges=true
