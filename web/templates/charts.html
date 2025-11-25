@@ -45,12 +45,40 @@
             margin-bottom: 20px;
             font-weight: bold;
         }
+        .nav-menu {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .nav-item {
+            padding: 10px 20px;
+            text-decoration: none;
+            color: #666;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.3s;
+        }
+        .nav-item:hover {
+            background: #e3f2fd;
+            color: #2196F3;
+        }
+        .nav-item.active {
+            background: #2196F3;
+            color: white;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📊 Графіки температури та активності</h1>
-        
+
+        <div class="nav-menu">
+            <a href="/" class="nav-item">📊 Статус</a>
+            <a href="/charts.html" class="nav-item active">📈 Графіки</a>
+        </div>
+
         {% if test_mode %}
         <div class="test-mode">⚠️ ТЕСТОВИЙ РЕЖИМ</div>
         {% endif %}

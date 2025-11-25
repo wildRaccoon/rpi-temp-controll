@@ -62,21 +62,80 @@
         .outlet-off {
             background: #ffcdd2;
         }
+        .outlet-unavailable {
+            background: #e0e0e0;
+        }
         .status-label {
             font-weight: bold;
             margin-right: 10px;
         }
+        .status-row {
+            margin-top: 10px;
+        }
+        .connection-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .connection-ok {
+            background: #4caf50;
+            color: white;
+        }
+        .connection-error {
+            background: #f44336;
+            color: white;
+        }
         .timestamp {
             color: #666;
             font-size: 14px;
-            margin-top: 10px;
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .last-update-time {
+            font-weight: bold;
+            color: #2196F3;
+            font-family: monospace;
+        }
+        .nav-menu {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .nav-item {
+            padding: 10px 20px;
+            text-decoration: none;
+            color: #666;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.3s;
+        }
+        .nav-item:hover {
+            background: #e3f2fd;
+            color: #2196F3;
+        }
+        .nav-item.active {
+            background: #2196F3;
+            color: white;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🔥 Статус системи опалення</h1>
-        
+
+        <div class="nav-menu">
+            <a href="/" class="nav-item active">📊 Статус</a>
+            <a href="/charts.html" class="nav-item">📈 Графіки</a>
+        </div>
+
         {% if test_mode %}
         <div class="test-mode">⚠️ ТЕСТОВИЙ РЕЖИМ</div>
         {% endif %}
@@ -91,25 +150,40 @@
         
         <div class="timestamp" id="last-update">Оновлення...</div>
     </div>
-    
+
     <script>
         function updateStatus() {
-            fetch('/api/system')
-                .then(response => response.json())
-                .then(data => {
-                    // Оновлення датчиків
-                    updateSensors(data);
-                    
-                    // Оновлення розетки
-                    updateOutlet(data);
-                    
-                    // Оновлення часу
-                    document.getElementById('last-update').textContent = 
-                        'Останнє оновлення: ' + new Date(data.timestamp).toLocaleString('uk-UA');
-                })
-                .catch(error => {
-                    console.error('Помилка оновлення:', error);
+            // Отримати дані системи
+            Promise.all([
+                fetch('/api/system').then(r => r.json()),
+                fetch('/api/outlet').then(r => r.json())
+            ])
+            .then(([systemData, outletData]) => {
+                // Оновлення датчиків
+                updateSensors(systemData);
+
+                // Оновлення розетки з детальною інформацією
+                updateOutlet(systemData, outletData);
+
+                // Оновлення часу з секундами
+                const now = new Date();
+                const systemTime = new Date(systemData.timestamp);
+                const timeString = systemTime.toLocaleString('uk-UA', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
                 });
+                document.getElementById('last-update').innerHTML =
+                    'Останнє оновлення даних: <span class="last-update-time">' + timeString + '</span>';
+            })
+            .catch(error => {
+                console.error('Помилка оновлення:', error);
+                document.getElementById('last-update').innerHTML =
+                    '<span style="color: red;">Помилка з\'єднання з сервером</span>';
+            });
         }
         
         function updateSensors(data) {
@@ -142,24 +216,105 @@
             });
         }
         
-        function updateOutlet(data) {
+        function updateOutlet(systemData, outletData) {
             const outletDiv = document.getElementById('outlet');
-            const isOn = data.outlet_status === 'on';
-            outletDiv.className = 'outlet-status ' + (isOn ? 'outlet-on' : 'outlet-off');
-            outletDiv.innerHTML = `
+            const status = outletData.status || systemData.outlet_status;
+
+            // Визначити клас CSS
+            let cssClass = 'outlet-status ';
+            if (status === 'unavailable') {
+                cssClass += 'outlet-unavailable';
+            } else if (status === 'on') {
+                cssClass += 'outlet-on';
+            } else {
+                cssClass += 'outlet-off';
+            }
+            outletDiv.className = cssClass;
+
+            // Статус підключення
+            let connectionBadge = '';
+            if (status === 'unavailable') {
+                connectionBadge = '<span class="connection-status connection-error">НЕ ПІДКЛЮЧЕНО</span>';
+            } else if (outletData.connected) {
+                connectionBadge = '<span class="connection-status connection-ok">ПІДКЛЮЧЕНО</span>';
+            } else {
+                connectionBadge = '<span class="connection-status connection-error">ПОМИЛКА ЗВ\'ЯЗКУ</span>';
+            }
+
+            // Текст статусу
+            let statusText = '';
+            if (status === 'unavailable') {
+                statusText = 'НЕ НАЛАШТОВАНО';
+            } else if (status === 'on') {
+                statusText = 'УВІМКНЕНО';
+            } else {
+                statusText = 'ВИМКНЕНО';
+            }
+
+            // Формування HTML
+            let html = `
                 <div>
-                    <span class="status-label">Розетка (теплий підлога):</span>
-                    <span style="font-size: 24px; font-weight: bold;">${isOn ? 'УВІМКНЕНО' : 'ВИМКНЕНО'}</span>
-                </div>
-                <div style="margin-top: 10px;">
-                    <span class="status-label">Причина:</span>
-                    <span>${data.outlet_reason || 'немає'}</span>
-                </div>
-                <div style="margin-top: 10px;">
-                    <span class="status-label">Стан системи:</span>
-                    <span>${data.state}</span>
+                    <span class="status-label">Розетка (циркуляційний насос):</span>
+                    <span style="font-size: 24px; font-weight: bold;">${statusText}</span>
+                    ${connectionBadge}
                 </div>
             `;
+
+            // IP адреса (якщо доступна)
+            if (outletData.ip_address) {
+                html += `
+                    <div class="status-row">
+                        <span class="status-label">IP адреса:</span>
+                        <span style="font-family: monospace;">${outletData.ip_address}</span>
+                    </div>
+                `;
+            }
+
+            // Останнє оновлення від розетки
+            if (outletData.last_update) {
+                const outletTime = new Date(outletData.last_update);
+                const outletTimeStr = outletTime.toLocaleString('uk-UA', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                html += `
+                    <div class="status-row">
+                        <span class="status-label">Останній зв'язок з розеткою:</span>
+                        <span style="font-family: monospace;">${outletTimeStr}</span>
+                    </div>
+                `;
+            }
+
+            // Повідомлення (для unavailable статусу)
+            if (outletData.message) {
+                html += `
+                    <div class="status-row">
+                        <span style="color: #666; font-style: italic;">${outletData.message}</span>
+                    </div>
+                `;
+            }
+
+            // Причина зміни стану
+            if (systemData.outlet_reason || outletData.reason) {
+                const reason = systemData.outlet_reason || outletData.reason;
+                html += `
+                    <div class="status-row">
+                        <span class="status-label">Причина:</span>
+                        <span>${reason}</span>
+                    </div>
+                `;
+            }
+
+            // Стан системи
+            html += `
+                <div class="status-row">
+                    <span class="status-label">Стан системи:</span>
+                    <span>${systemData.state}</span>
+                </div>
+            `;
+
+            outletDiv.innerHTML = html;
         }
         
         // Оновлення кожні 10 секунд
