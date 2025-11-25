@@ -69,12 +69,17 @@ class TemperatureControlApp:
         self.sensor_manager = SensorManager(self.config)
         
         # Контролер розетки Sonoff S60 з Tasmota
-        if self.config.is_test_mode():
-            self.sonoff_controller = TestSonoffController(self.config)
+        sonoff_config = self.config.get_section('sonoff')
+        if sonoff_config and sonoff_config.get('ip_address'):
+            if self.config.is_test_mode():
+                self.sonoff_controller = TestSonoffController(self.config)
+            else:
+                self.sonoff_controller = SonoffController(self.config)
+                if not self.sonoff_controller.connect():
+                    self.logger.warning("Не вдалося підключитися до розетки Sonoff, продовжуємо...")
         else:
-            self.sonoff_controller = SonoffController(self.config)
-            if not self.sonoff_controller.connect():
-                self.logger.warning("Не вдалося підключитися до розетки Sonoff, продовжуємо...")
+            self.logger.warning("Конфігурація Sonoff відсутня. Система працюватиме без керування розеткою.")
+            self.sonoff_controller = None
 
         # Контролер температури
         self.temperature_controller = TemperatureController(
@@ -205,11 +210,12 @@ class TemperatureControlApp:
                 outlet_reason = self.temperature_controller.update_control()
                 
                 # Збереження події розетки, якщо стан змінився
-                current_outlet_state = self.temperature_controller.sonoff_controller.get_status()
-                if current_outlet_state != last_outlet_state and outlet_reason:
-                    action = 'on' if current_outlet_state else 'off'
-                    self.database.save_outlet_event(action, outlet_reason)
-                    last_outlet_state = current_outlet_state
+                if self.temperature_controller.sonoff_controller is not None:
+                    current_outlet_state = self.temperature_controller.sonoff_controller.get_status()
+                    if current_outlet_state != last_outlet_state and outlet_reason:
+                        action = 'on' if current_outlet_state else 'off'
+                        self.database.save_outlet_event(action, outlet_reason)
+                        last_outlet_state = current_outlet_state
                 
                 # Логування (періодично)
                 now = datetime.now()

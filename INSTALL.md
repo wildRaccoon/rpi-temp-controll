@@ -384,7 +384,7 @@ sudo systemctl status temperature.service
 sudo systemctl status temperature.service
 
 # Переглянути логи
-sudo journalctl -u temperature.service -f
+   sudo journalctl -u temperature.service -f
 
 # Перезапустити
 sudo systemctl restart temperature.service

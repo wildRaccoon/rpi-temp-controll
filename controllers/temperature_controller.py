@@ -160,20 +160,30 @@ class TemperatureController:
     def update_control(self) -> Optional[str]:
         """
         Оновити контроль температури та керування розеткою.
-        
+
         Returns:
             Причина зміни стану або None
         """
         # Отримати поточні температури
         self.get_temperatures()
-        
+
+        # Якщо контролер розетки відсутній, тільки логуємо
+        if self.sonoff_controller is None:
+            should_on, reason_on = self.should_turn_on()
+            should_off, reason_off = self.should_turn_off()
+            if should_on:
+                self.logger.info(f"[БЕЗ РОЗЕТКИ] Потрібно увімкнути розетку. Причина: {reason_on}")
+            elif should_off:
+                self.logger.info(f"[БЕЗ РОЗЕТКИ] Потрібно вимкнути розетку. Причина: {reason_off}")
+            return None
+
         # Отримати поточний стан розетки
         current_state = self.sonoff_controller.get_status()
-        
+
         # Визначити, чи потрібно змінити стан
         should_on, reason_on = self.should_turn_on()
         should_off, reason_off = self.should_turn_off()
-        
+
         # Логіка керування
         if should_on and (current_state is False or current_state is None):
             # Потрібно увімкнути
@@ -182,7 +192,7 @@ class TemperatureController:
                 self.last_outlet_reason = reason_on
                 self.logger.info(f"Розетка увімкнена. Причина: {reason_on}")
                 return reason_on
-        
+
         elif should_off and (current_state is True):
             # Потрібно вимкнути
             if self.sonoff_controller.turn_off():
@@ -190,22 +200,27 @@ class TemperatureController:
                 self.last_outlet_reason = reason_off
                 self.logger.info(f"Розетка вимкнена. Причина: {reason_off}")
                 return reason_off
-        
+
         # Стан не змінився
         return None
     
     def get_system_state(self) -> Dict[str, Any]:
         """
         Отримати поточний стан системи.
-        
+
         Returns:
             Словник зі станом системи
         """
         boiler_temp = self.get_boiler_temp()
         bottom_temp, top_temp = self.get_accumulator_temps()
         chimney_temp = self.get_chimney_temp()
-        outlet_status = self.sonoff_controller.get_status()
-        
+
+        # Отримати стан розетки (якщо контролер доступний)
+        if self.sonoff_controller is not None:
+            outlet_status = self.sonoff_controller.get_status()
+        else:
+            outlet_status = None
+
         # Визначити загальний стан системи
         if self.is_startup_period():
             system_state = "startup"
@@ -213,14 +228,14 @@ class TemperatureController:
             system_state = "cooling_down"
         else:
             system_state = "running"
-        
+
         return {
             'state': system_state,
             'boiler_temp': boiler_temp,
             'accumulator_bottom_temp': bottom_temp,
             'accumulator_top_temp': top_temp,
             'chimney_temp': chimney_temp,
-            'outlet_status': 'on' if outlet_status else 'off',
+            'outlet_status': 'on' if outlet_status else ('off' if outlet_status is False else 'unavailable'),
             'outlet_reason': self.last_outlet_reason,
             'timestamp': datetime.now().isoformat(),
             'startup_remaining_seconds': max(0, int((self.startup_duration - (datetime.now() - self.start_time)).total_seconds()))

@@ -77,13 +77,19 @@ class APIServer:
         def api_status():
             """Загальний статус системи."""
             sensors = self.sensor_manager.get_all_status()
-            outlet_info = self.temperature_controller.sonoff_controller.get_info()
-            
+
+            # Отримати інформацію про розетку (якщо контролер доступний)
+            if self.temperature_controller.sonoff_controller is not None:
+                outlet_info = self.temperature_controller.sonoff_controller.get_info()
+                outlet_status = 'on' if outlet_info.get('status') else 'off'
+            else:
+                outlet_status = 'unavailable'
+
             return jsonify({
                 'status': 'running',
                 'timestamp': self.temperature_controller.get_system_state()['timestamp'],
                 'sensors_count': len(sensors),
-                'outlet_status': 'on' if outlet_info.get('status') else 'off',
+                'outlet_status': outlet_status,
                 'test_mode': self.config.is_test_mode()
             })
         
@@ -104,9 +110,19 @@ class APIServer:
         @self.app.route('/api/outlet')
         def api_outlet():
             """Статус розетки Sonoff S60."""
-            outlet_info = self.temperature_controller.sonoff_controller.get_info()
             system_state = self.temperature_controller.get_system_state()
-            
+
+            # Якщо контролер розетки відсутній
+            if self.temperature_controller.sonoff_controller is None:
+                return jsonify({
+                    'status': 'unavailable',
+                    'connected': False,
+                    'reason': 'Конфігурація Sonoff відсутня',
+                    'message': 'Система працює без керування розеткою'
+                })
+
+            outlet_info = self.temperature_controller.sonoff_controller.get_info()
+
             return jsonify({
                 'status': 'on' if outlet_info.get('status') else 'off',
                 'ip_address': outlet_info.get('ip_address'),

@@ -89,11 +89,15 @@ class ConfigManager:
     def validate(self) -> bool:
         """
         Валідація конфігурації.
-        
+
         Returns:
             True якщо конфігурація валідна
         """
-        required_sections = ['sensors', 'sonoff', 'control', 'api']
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Sonoff більше не обов'язковий - система може працювати без керування розеткою
+        required_sections = ['sensors', 'control', 'api']
 
         for section in required_sections:
             if section not in self.config:
@@ -104,11 +108,11 @@ class ConfigManager:
         if not sensors.get('ds18b20') and not sensors.get('max31855'):
             raise ValueError("Повинен бути увімкнений хоча б один датчик")
 
-        # Перевірка налаштувань Sonoff
+        # Перевірка налаштувань Sonoff (опціонально)
         sonoff = self.get_section('sonoff')
-        if not sonoff.get('ip_address'):
-            raise ValueError("Не вказано IP адресу розетки Sonoff")
-        
+        if not sonoff or not sonoff.get('ip_address'):
+            logger.warning("Конфігурація Sonoff відсутня або неповна. Система працюватиме без керування розеткою.")
+
         return True
     
     def reload(self) -> None:
