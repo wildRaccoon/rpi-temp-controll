@@ -39,7 +39,7 @@ class SonoffController:
         self.ip_address = sonoff_config.get('ip_address')
 
         # Опціональна підтримка MQTT (поки не реалізована)
-        mqtt_config = config.get_section('mqtt', {})
+        mqtt_config = config.get_section('mqtt')
         self.mqtt_enabled = mqtt_config.get('enabled', False)
 
         if not self.ip_address:
