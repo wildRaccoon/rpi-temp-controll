@@ -102,6 +102,29 @@
             color: #2196F3;
             font-family: monospace;
         }
+        .system-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .cpu-temp {
+            display: inline-block;
+            font-size: 18px;
+            font-weight: bold;
+            color: #666;
+            margin-left: 10px;
+        }
+        .cpu-temp.normal {
+            color: #4caf50;
+        }
+        .cpu-temp.warm {
+            color: #ff9800;
+        }
+        .cpu-temp.hot {
+            color: #f44336;
+        }
         .nav-menu {
             display: flex;
             gap: 10px;
@@ -147,7 +170,12 @@
         <div id="outlet" class="outlet-status">
             <!-- Статус розетки буде додано через JavaScript -->
         </div>
-        
+
+        <div class="system-info">
+            <span class="status-label">🖥️ Температура процесора Raspberry Pi:</span>
+            <span class="cpu-temp" id="cpu-temp">--°C</span>
+        </div>
+
         <div class="timestamp" id="last-update">Оновлення...</div>
     </div>
 
@@ -164,6 +192,9 @@
 
                 // Оновлення розетки з детальною інформацією
                 updateOutlet(systemData, outletData);
+
+                // Оновлення температури CPU
+                updateCPUTemp(systemData);
 
                 // Оновлення часу з секундами
                 const now = new Date();
@@ -316,7 +347,29 @@
 
             outletDiv.innerHTML = html;
         }
-        
+
+        function updateCPUTemp(data) {
+            const cpuTempElement = document.getElementById('cpu-temp');
+
+            if (data.cpu_temp !== undefined && data.cpu_temp !== null) {
+                const temp = data.cpu_temp;
+                cpuTempElement.textContent = temp.toFixed(1) + '°C';
+
+                // Визначити колір в залежності від температури
+                cpuTempElement.className = 'cpu-temp';
+                if (temp < 60) {
+                    cpuTempElement.classList.add('normal');
+                } else if (temp < 75) {
+                    cpuTempElement.classList.add('warm');
+                } else {
+                    cpuTempElement.classList.add('hot');
+                }
+            } else {
+                cpuTempElement.textContent = 'N/A';
+                cpuTempElement.className = 'cpu-temp';
+            }
+        }
+
         // Оновлення кожні 10 секунд
         updateStatus();
         setInterval(updateStatus, 10000);

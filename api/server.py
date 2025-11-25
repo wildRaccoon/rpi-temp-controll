@@ -135,7 +135,14 @@ class APIServer:
         @self.app.route('/api/system')
         def api_system():
             """Статус системи опалення."""
-            return jsonify(self.temperature_controller.get_system_state())
+            system_state = self.temperature_controller.get_system_state()
+
+            # Додати температуру CPU Raspberry Pi
+            cpu_temp = self._get_cpu_temperature()
+            if cpu_temp is not None:
+                system_state['cpu_temp'] = cpu_temp
+
+            return jsonify(system_state)
         
         @self.app.route('/api/history/temperatures')
         def api_history_temperatures():
@@ -172,7 +179,28 @@ class APIServer:
                 'period_hours': hours,
                 'events': events
             })
-    
+
+    def _get_cpu_temperature(self) -> Optional[float]:
+        """
+        Отримати температуру CPU Raspberry Pi.
+
+        Returns:
+            Температура в градусах Цельсія або None
+        """
+        try:
+            # Для Linux систем (Raspberry Pi)
+            import platform
+            if platform.system() == 'Linux':
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp_raw = f.read().strip()
+                    return float(temp_raw) / 1000.0
+            else:
+                # Для інших систем (Windows, macOS) - симуляція
+                return None
+        except Exception as e:
+            self.logger.debug(f"Не вдалося отримати температуру CPU: {e}")
+            return None
+
     def start(self) -> None:
         """Запустити API сервер в окремому потоці."""
         if self.is_running:
