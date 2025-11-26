@@ -40,6 +40,7 @@ class TemperatureController:
         self.accumulator_critical_temp = control_config.get('accumulator_critical_temp', 80.0)
         self.boiler_safe_temp = control_config.get('boiler_safe_temp', 70.0)
         self.accumulator_safe_temp = control_config.get('accumulator_safe_temp', 65.0)
+        self.chimney_critical_temp = control_config.get('chimney_critical_temp', 250.0)
         self.chimney_low_temp = control_config.get('chimney_low_temp', 100.0)
         self.hysteresis = control_config.get('hysteresis', 3.0)
         self.startup_duration = timedelta(seconds=control_config.get('startup_duration', 300))
@@ -107,36 +108,42 @@ class TemperatureController:
     def should_turn_on(self) -> Tuple[bool, str]:
         """
         Визначити, чи потрібно увімкнути розетку.
-        
+
         Returns:
             Кортеж (чи_увімкнути, причина)
         """
         # Початковий період
         if self.is_startup_period():
             return (True, "startup")
-        
+
         boiler_temp = self.get_boiler_temp()
         bottom_temp, top_temp = self.get_accumulator_temps()
         max_accumulator_temp = max(
             t for t in [bottom_temp, top_temp] if t is not None
         ) if (bottom_temp is not None or top_temp is not None) else None
-        
+        chimney_temp = self.get_chimney_temp()
+
+        # Критична температура димоходу (найвищий пріоритет!)
+        if chimney_temp is not None:
+            if chimney_temp >= (self.chimney_critical_temp - self.hysteresis):
+                return (True, "chimney_critical")
+
         # Критична температура котла
         if boiler_temp is not None:
             if boiler_temp >= (self.boiler_critical_temp - self.hysteresis):
                 return (True, "boiler_critical")
-        
+
         # Критична температура термоакумулятора
         if max_accumulator_temp is not None:
             if max_accumulator_temp >= (self.accumulator_critical_temp - self.hysteresis):
                 return (True, "accumulator_critical")
-        
+
         return (False, None)
     
     def should_turn_off(self) -> Tuple[bool, str]:
         """
         Визначити, чи потрібно вимкнути розетку.
-        
+
         Returns:
             Кортеж (чи_вимкнути, причина)
         """
@@ -146,15 +153,20 @@ class TemperatureController:
             t for t in [bottom_temp, top_temp] if t is not None
         ) if (bottom_temp is not None or top_temp is not None) else None
         chimney_temp = self.get_chimney_temp()
-        
+
+        # НЕ вимикати насос якщо димохід перегрітий (має пріоритет)
+        if chimney_temp is not None:
+            if chimney_temp >= (self.chimney_critical_temp - self.hysteresis):
+                return (False, None)
+
         # Перевірка безпечних температур
         boiler_safe = boiler_temp is None or boiler_temp < (self.boiler_safe_temp + self.hysteresis)
         accumulator_safe = max_accumulator_temp is None or max_accumulator_temp < (self.accumulator_safe_temp + self.hysteresis)
         chimney_low = chimney_temp is None or chimney_temp < self.chimney_low_temp
-        
+
         if boiler_safe and accumulator_safe and chimney_low:
             return (True, "safe_temperatures")
-        
+
         return (False, None)
     
     def update_control(self) -> Optional[str]:
