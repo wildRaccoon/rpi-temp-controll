@@ -59,7 +59,10 @@ control:
   
   # Інтервали
   check_interval: 30               # Інтервал перевірки (секунди)
-  startup_duration: 300            # Тривалість початкового стану "затопили" (секунди)
+
+  # Визначення режиму startup (затоплення котла)
+  startup_detection_period: 120    # Період аналізу для визначення режиму startup (секунди, рекомендовано 120)
+  startup_temp_increase: 5.0       # Мінімальне збільшення температури для визначення startup (°C)
   
 logging:
   enabled: true

@@ -2,8 +2,9 @@
 Модуль для контролю температури та керування розеткою.
 """
 
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from datetime import datetime, timedelta
+from collections import deque
 
 from sensors.sensor_manager import SensorManager
 from controllers.sonoff_controller import SonoffController
@@ -43,33 +44,90 @@ class TemperatureController:
         self.chimney_critical_temp = control_config.get('chimney_critical_temp', 250.0)
         self.chimney_low_temp = control_config.get('chimney_low_temp', 100.0)
         self.hysteresis = control_config.get('hysteresis', 3.0)
-        self.startup_duration = timedelta(seconds=control_config.get('startup_duration', 300))
-        
+
+        # Налаштування для визначення режиму startup (затоплення)
+        self.startup_detection_period = timedelta(seconds=control_config.get('startup_detection_period', 120))  # 2 хвилини
+        self.startup_temp_increase = control_config.get('startup_temp_increase', 5.0)  # Мінімальне збільшення температури (°C)
+
         # Стан системи
-        self.start_time = datetime.now()
         self.current_outlet_state: Optional[bool] = None
         self.last_outlet_reason: Optional[str] = None
         self.last_temperatures: Dict[str, Optional[float]] = {}
+
+        # Історія температур для визначення тренду (зберігаємо за останні 2 хвилини)
+        self.temperature_history: deque = deque(maxlen=100)  # (timestamp, boiler_temp, chimney_temp)
     
     def is_startup_period(self) -> bool:
         """
         Перевірити, чи триває початковий період (котел щойно затопили).
-        
+        Визначається за зростанням температури котла і димоходу за останні 2 хвилини.
+
         Returns:
-            True якщо триває початковий період
+            True якщо триває початковий період (температури активно зростають)
         """
-        elapsed = datetime.now() - self.start_time
-        return elapsed < self.startup_duration
+        # Потрібно мати достатньо даних для аналізу (хоча б 2 точки)
+        if len(self.temperature_history) < 2:
+            return False
+
+        now = datetime.now()
+        # Фільтруємо записи за останній період (startup_detection_period)
+        recent_readings = [
+            reading for reading in self.temperature_history
+            if (now - reading[0]) <= self.startup_detection_period
+        ]
+
+        if len(recent_readings) < 2:
+            return False
+
+        # Перша і остання точка для порівняння
+        first_reading = recent_readings[0]
+        last_reading = recent_readings[-1]
+
+        first_boiler = first_reading[1]
+        last_boiler = last_reading[1]
+        first_chimney = first_reading[2]
+        last_chimney = last_reading[2]
+
+        # Перевірка зростання температур
+        boiler_increasing = False
+        chimney_increasing = False
+
+        if first_boiler is not None and last_boiler is not None:
+            boiler_increase = last_boiler - first_boiler
+            boiler_increasing = boiler_increase >= self.startup_temp_increase
+
+        if first_chimney is not None and last_chimney is not None:
+            chimney_increase = last_chimney - first_chimney
+            chimney_increasing = chimney_increase >= self.startup_temp_increase
+
+        # Режим startup активний якщо обидві температури зростають
+        is_startup = boiler_increasing and chimney_increasing
+
+        return is_startup
     
     def get_temperatures(self) -> Dict[str, Optional[float]]:
         """
         Отримати температури з усіх датчиків.
-        
+
         Returns:
             Словник {sensor_id: temperature}
         """
         readings = self.sensor_manager.read_all()
         self.last_temperatures = readings
+
+        # Зберегти в історію для аналізу тренду
+        boiler_temp = None
+        chimney_temp = None
+
+        for sensor_id, temp in readings.items():
+            if 'boiler' in sensor_id:
+                boiler_temp = temp
+            elif 'chimney' in sensor_id:
+                chimney_temp = temp
+
+        # Додати запис до історії (timestamp, boiler_temp, chimney_temp)
+        self.temperature_history.append((datetime.now(), boiler_temp, chimney_temp))
+
         return readings
     
     def get_boiler_temp(self) -> Optional[float]:
@@ -250,6 +308,7 @@ class TemperatureController:
             'outlet_status': 'on' if outlet_status else ('off' if outlet_status is False else 'unavailable'),
             'outlet_reason': self.last_outlet_reason,
             'timestamp': datetime.now().isoformat(),
-            'startup_remaining_seconds': max(0, int((self.startup_duration - (datetime.now() - self.start_time)).total_seconds()))
+            'is_startup': self.is_startup_period(),
+            'temperature_history_size': len(self.temperature_history)
         }
 
