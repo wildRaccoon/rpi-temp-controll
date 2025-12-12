@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import requests
 from urllib.parse import quote
+import time
 
 from utils.config_manager import ConfigManager
 from utils.logger import get_logger
@@ -32,11 +33,16 @@ class SonoffController:
         self.offline_mode = False
         self.simulated_state: bool = False
 
-        # Таймаут для HTTP запитів (секунди)
-        self.timeout = 5
-
         sonoff_config = config.get_section('sonoff')
         self.ip_address = sonoff_config.get('ip_address')
+
+        # Налаштування повторних спроб
+        self.retry_attempts = max(1, min(10, sonoff_config.get('retry_attempts', 3)))
+        self.retry_delay = max(0.5, min(10.0, sonoff_config.get('retry_delay', 2.0)))
+        self.timeout = max(1.0, min(30.0, sonoff_config.get('connection_timeout', 5.0)))
+
+        # Дозволити автоматичне перемикання в режим симуляції при помилках
+        self.allow_simulation = sonoff_config.get('allow_simulation', False)
 
         # Опціональна підтримка MQTT (поки не реалізована)
         mqtt_config = config.get_section('mqtt')
@@ -61,7 +67,7 @@ class SonoffController:
 
     def _send_command(self, command: str) -> Optional[Dict[str, Any]]:
         """
-        Відправити команду до Tasmota через HTTP API.
+        Відправити команду до Tasmota через HTTP API з повторними спробами.
 
         Args:
             command: Команда для виконання
@@ -72,23 +78,51 @@ class SonoffController:
         if self.offline_mode:
             return None
 
-        try:
-            url = self._build_url(command)
-            response = requests.get(url, timeout=self.timeout)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.Timeout:
-            self.logger.warning(f"Таймаут при спробі зв'язатися з Sonoff ({self.ip_address})")
-            return None
-        except requests.exceptions.ConnectionError:
-            self.logger.warning(f"Помилка з'єднання з Sonoff ({self.ip_address})")
-            return None
-        except requests.exceptions.HTTPError as e:
-            self.logger.warning(f"HTTP помилка від Sonoff: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Несподівана помилка при відправці команди до Sonoff: {e}")
-            return None
+        url = self._build_url(command)
+        last_error = None
+
+        # Спроби виконати команду з повторами
+        for attempt in range(1, self.retry_attempts + 1):
+            try:
+                response = requests.get(url, timeout=self.timeout)
+                response.raise_for_status()
+
+                # Успішна відповідь - скидаємо offline_mode якщо був активний
+                if self.offline_mode and self.allow_simulation:
+                    self.logger.info("З'єднання з Sonoff відновлено, вихід з режиму симуляції")
+                    self.offline_mode = False
+
+                return response.json()
+
+            except requests.exceptions.Timeout as e:
+                last_error = f"Таймаут при спробі зв'язатися з Sonoff ({self.ip_address})"
+                if attempt < self.retry_attempts:
+                    self.logger.debug(f"{last_error}. Спроба {attempt}/{self.retry_attempts}, повтор через {self.retry_delay}с...")
+                    time.sleep(self.retry_delay)
+                else:
+                    self.logger.warning(f"{last_error}. Всі {self.retry_attempts} спроб вичерпано")
+
+            except requests.exceptions.ConnectionError as e:
+                last_error = f"Помилка з'єднання з Sonoff ({self.ip_address})"
+                if attempt < self.retry_attempts:
+                    self.logger.debug(f"{last_error}. Спроба {attempt}/{self.retry_attempts}, повтор через {self.retry_delay}с...")
+                    time.sleep(self.retry_delay)
+                else:
+                    self.logger.warning(f"{last_error}. Всі {self.retry_attempts} спроб вичерпано")
+
+            except requests.exceptions.HTTPError as e:
+                last_error = f"HTTP помилка від Sonoff: {e}"
+                # HTTP помилки зазвичай не потребують повтору
+                self.logger.warning(last_error)
+                break
+
+            except Exception as e:
+                last_error = f"Несподівана помилка при відправці команди до Sonoff: {e}"
+                self.logger.error(last_error)
+                break
+
+        # Всі спроби вичерпані
+        return None
 
     def connect(self) -> bool:
         """
@@ -138,12 +172,17 @@ class SonoffController:
             True якщо команда виконана успішно
         """
         if self.offline_mode:
-            # Режим офлайн - симулюємо вмикання
-            self.simulated_state = True
-            self.last_status = True
-            self.last_update = datetime.now()
-            self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: увімкнена")
-            return True
+            if self.allow_simulation:
+                # Режим офлайн з дозволом симуляції
+                self.simulated_state = True
+                self.last_status = True
+                self.last_update = datetime.now()
+                self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: увімкнена")
+                return True
+            else:
+                # Режим офлайн БЕЗ дозволу симуляції - повертаємо помилку
+                self.logger.error("Не вдалося увімкнути розетку: немає зв'язку з пристроєм (симуляція вимкнена)")
+                return False
 
         result = self._send_command("Power On")
         if result is not None:
@@ -163,16 +202,22 @@ class SonoffController:
                 self.last_update = datetime.now()
                 return True
         else:
-            # Не вдалося відправити команду - переходимо в режим офлайн
-            self.logger.warning("Не вдалося увімкнути розетку. Переходжу в режим офлайн")
+            # Не вдалося відправити команду після всіх спроб
             self.is_connected = False
-            self.offline_mode = True
-            # Симулюємо вмикання
-            self.simulated_state = True
-            self.last_status = True
-            self.last_update = datetime.now()
-            self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: увімкнена")
-            return True
+
+            if self.allow_simulation:
+                # Переходимо в режим офлайн
+                self.logger.warning("Не вдалося увімкнути розетку після всіх спроб. Переходжу в режим симуляції")
+                self.offline_mode = True
+                self.simulated_state = True
+                self.last_status = True
+                self.last_update = datetime.now()
+                self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: увімкнена")
+                return True
+            else:
+                # Симуляція вимкнена - повертаємо помилку
+                self.logger.error("Не вдалося увімкнути розетку після всіх спроб (симуляція вимкнена)")
+                return False
 
     def turn_off(self) -> bool:
         """
@@ -182,12 +227,17 @@ class SonoffController:
             True якщо команда виконана успішно
         """
         if self.offline_mode:
-            # Режим офлайн - симулюємо вимкнення
-            self.simulated_state = False
-            self.last_status = False
-            self.last_update = datetime.now()
-            self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: вимкнена")
-            return True
+            if self.allow_simulation:
+                # Режим офлайн з дозволом симуляції
+                self.simulated_state = False
+                self.last_status = False
+                self.last_update = datetime.now()
+                self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: вимкнена")
+                return True
+            else:
+                # Режим офлайн БЕЗ дозволу симуляції - повертаємо помилку
+                self.logger.error("Не вдалося вимкнути розетку: немає зв'язку з пристроєм (симуляція вимкнена)")
+                return False
 
         result = self._send_command("Power Off")
         if result is not None:
@@ -207,16 +257,22 @@ class SonoffController:
                 self.last_update = datetime.now()
                 return True
         else:
-            # Не вдалося відправити команду - переходимо в режим офлайн
-            self.logger.warning("Не вдалося вимкнути розетку. Переходжу в режим офлайн")
+            # Не вдалося відправити команду після всіх спроб
             self.is_connected = False
-            self.offline_mode = True
-            # Симулюємо вимкнення
-            self.simulated_state = False
-            self.last_status = False
-            self.last_update = datetime.now()
-            self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: вимкнена")
-            return True
+
+            if self.allow_simulation:
+                # Переходимо в режим офлайн
+                self.logger.warning("Не вдалося вимкнути розетку після всіх спроб. Переходжу в режим симуляції")
+                self.offline_mode = True
+                self.simulated_state = False
+                self.last_status = False
+                self.last_update = datetime.now()
+                self.logger.info("Розетка Sonoff [СИМУЛЯЦІЯ]: вимкнена")
+                return True
+            else:
+                # Симуляція вимкнена - повертаємо помилку
+                self.logger.error("Не вдалося вимкнути розетку після всіх спроб (симуляція вимкнена)")
+                return False
 
     def get_status(self) -> Optional[bool]:
         """
@@ -226,8 +282,12 @@ class SonoffController:
             True якщо увімкнена, False якщо вимкнена, None при помилці
         """
         if self.offline_mode:
-            # Режим офлайн - повертаємо симульований стан
-            return self.simulated_state
+            if self.allow_simulation:
+                # Режим офлайн з дозволом симуляції - повертаємо симульований стан
+                return self.simulated_state
+            else:
+                # Режим офлайн БЕЗ дозволу симуляції - повертаємо None (помилка)
+                return None
 
         result = self._send_command("Power")
         if result is not None:
@@ -245,12 +305,18 @@ class SonoffController:
                 # Повернути останній відомий стан
                 return self.last_status
         else:
-            # Не вдалося отримати статус
-            self.logger.warning("Не вдалося отримати статус розетки. Використовую останній відомий стан")
+            # Не вдалося отримати статус після всіх спроб
             self.is_connected = False
-            self.offline_mode = True
-            # Повертаємо останній відомий стан
-            return self.last_status if self.last_status is not None else self.simulated_state
+
+            if self.allow_simulation:
+                # Переходимо в режим офлайн
+                self.logger.warning("Не вдалося отримати статус розетки. Використовую останній відомий стан (режим симуляції)")
+                self.offline_mode = True
+                return self.last_status if self.last_status is not None else self.simulated_state
+            else:
+                # Симуляція вимкнена - повертаємо None
+                self.logger.error("Не вдалося отримати статус розетки після всіх спроб (симуляція вимкнена)")
+                return None
 
     def set_state(self, state: bool) -> bool:
         """
@@ -275,13 +341,18 @@ class SonoffController:
             True якщо команда виконана успішно
         """
         if self.offline_mode:
-            # Режим офлайн - симулюємо перемикання
-            self.simulated_state = not self.simulated_state
-            self.last_status = self.simulated_state
-            self.last_update = datetime.now()
-            state_str = "увімкнена" if self.simulated_state else "вимкнена"
-            self.logger.info(f"Розетка Sonoff [СИМУЛЯЦІЯ]: перемкнута, тепер {state_str}")
-            return True
+            if self.allow_simulation:
+                # Режим офлайн з дозволом симуляції
+                self.simulated_state = not self.simulated_state
+                self.last_status = self.simulated_state
+                self.last_update = datetime.now()
+                state_str = "увімкнена" if self.simulated_state else "вимкнена"
+                self.logger.info(f"Розетка Sonoff [СИМУЛЯЦІЯ]: перемкнута, тепер {state_str}")
+                return True
+            else:
+                # Режим офлайн БЕЗ дозволу симуляції
+                self.logger.error("Не вдалося перемкнути розетку: немає зв'язку з пристроєм (симуляція вимкнена)")
+                return False
 
         result = self._send_command("Power Toggle")
         if result is not None:
@@ -298,8 +369,21 @@ class SonoffController:
                 self.logger.warning(f"Несподівана відповідь від Sonoff при перемиканні: {result}")
                 return True
         else:
-            self.logger.warning("Не вдалося перемкнути розетку")
-            return False
+            # Не вдалося перемкнути після всіх спроб
+            self.is_connected = False
+
+            if self.allow_simulation:
+                self.logger.warning("Не вдалося перемкнути розетку після всіх спроб. Переходжу в режим симуляції")
+                self.offline_mode = True
+                self.simulated_state = not self.simulated_state
+                self.last_status = self.simulated_state
+                self.last_update = datetime.now()
+                state_str = "увімкнена" if self.simulated_state else "вимкнена"
+                self.logger.info(f"Розетка Sonoff [СИМУЛЯЦІЯ]: перемкнута, тепер {state_str}")
+                return True
+            else:
+                self.logger.error("Не вдалося перемкнути розетку після всіх спроб (симуляція вимкнена)")
+                return False
 
     def get_info(self) -> Dict[str, Any]:
         """
@@ -315,7 +399,11 @@ class SonoffController:
             'status': self.last_status,
             'simulated': self.offline_mode,
             'device_type': 'sonoff_s60_tasmota',
-            'last_update': self.last_update.isoformat() if self.last_update else None
+            'last_update': self.last_update.isoformat() if self.last_update else None,
+            'allow_simulation': self.allow_simulation,
+            'retry_attempts': self.retry_attempts,
+            'retry_delay': self.retry_delay,
+            'timeout': self.timeout
         }
 
     def get_device_info(self) -> Optional[Dict[str, Any]]:
