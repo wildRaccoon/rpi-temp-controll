@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.config_manager import ConfigManager
 from sensors.sensor_manager import SensorManager
-from controllers.tapo_controller import TapoController
+from controllers.sonoff_controller import SonoffController
 from controllers.temperature_controller import TemperatureController
 
 def test_components():
@@ -52,25 +52,25 @@ def test_components():
         traceback.print_exc()
         return False
 
-    # 3. Tapo Controller
-    print("\n3. Ініціалізація контролера розетки...")
+    # 3. Sonoff Controller
+    print("\n3. Ініціалізація контролера розетки Sonoff...")
     try:
-        tapo = TapoController(config)
-        print(f"   ✓ TapoController створено")
-        print(f"     IP: {tapo.ip_address}")
-        print(f"     Offline mode: {tapo.offline_mode}")
+        sonoff = SonoffController(config)
+        print(f"   ✓ SonoffController створено")
+        print(f"     IP: {sonoff.ip_address}")
+        print(f"     Offline mode: {sonoff.offline_mode}")
 
         # Тест get_status
-        status = tapo.get_status()
+        status = sonoff.get_status()
         print(f"     Статус: {status}")
         print(f"   ✓ get_status() працює")
 
         # Тест turn_on
-        tapo.turn_on()
+        sonoff.turn_on()
         print(f"   ✓ turn_on() працює")
 
         # Тест turn_off
-        tapo.turn_off()
+        sonoff.turn_off()
         print(f"   ✓ turn_off() працює")
 
     except Exception as e:
@@ -82,7 +82,7 @@ def test_components():
     # 4. Temperature Controller
     print("\n4. Ініціалізація контролера температури...")
     try:
-        temp_ctrl = TemperatureController(sensor_manager, tapo, config)
+        temp_ctrl = TemperatureController(sensor_manager, sonoff, config)
         system_state = temp_ctrl.get_system_state()
         print(f"   ✓ TemperatureController створено")
         print(f"     Стан системи: {system_state['state']}")
